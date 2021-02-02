@@ -25,19 +25,76 @@ _declspec(dllexport) void D::OutputDebugStringEx(const char* strOutputString, ..
     delete[] strBuffer;
 }
 
+_declspec(dllexport) int D::GetWindowsText(HWND pWinHwnd, PSTR& pcText) {
+  
+    int cTxtLen = GetWindowTextLength(pWinHwnd);
 
-HWND D::AbstractControl::Create() {
+    if (cTxtLen) {
+        pcText = (PSTR)VirtualAlloc(
+            (LPVOID)NULL,
+            (DWORD)(cTxtLen + 1),
+            MEM_COMMIT,
+            PAGE_READWRITE);
+
+        GetWindowText(
+            pWinHwnd,
+            pcText,
+            cTxtLen + 1);
+    }
+
+    // Allocate memory for the string and copy 
+    // the string into the memory. 
+    
+    // Free the memory and return. 
+    //VirtualFree(pcText, 0, MEM_RELEASE);
+    return cTxtLen;
+}
+
+
+
+_declspec(dllexport) bool D::ReadProcessMemoryEx(
+    HANDLE& hProcess,
+    LPCVOID lpBaseAddress,
+    LPVOID& lpBuffer,
+    SIZE_T nSize,   
+    DWORD dwDesiredAccess = NULL
+) {
+    bool bIsClearProcess = FALSE;
+    if (hProcess == NULL && dwDesiredAccess != NULL) {
+        bIsClearProcess = TRUE;
+        hProcess = OpenProcess(
+            PROCESS_ALL_ACCESS,     // 所有权限
+            FALSE,                  // 不继承
+            dwDesiredAccess
+        );
+    }
+
+    if (hProcess == NULL) {
+        D::OutputDebugStringEx("\n ERROR_INFO OpenProcess | %d", GetLastError());
+        return FALSE;
+    }
+
+    if (!ReadProcessMemory(hProcess, lpBaseAddress, lpBuffer, nSize, NULL)) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+HWND D::AbstractWindow::Create() {
+    D::OutputDebugStringEx("=================================");
+    D::OutputDebugStringEx("\n lpClassName:[%s] lpWindowName:[%s]", this->lpClassName, this->lpWindowName);
     HWND hwnd = CreateWindow(
-        (LPCSTR) "BUTTON",  // Predefined class; Unicode assumed 
-        (LPCSTR)"OK",      // Button text 
-        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
-        10,         // x position 
-        10,         // y position 
-        100,        // Button width
-        100,        // Button height
+        (LPCSTR)this->lpClassName,  // Predefined class; Unicode assumed 
+        (LPCSTR)this->lpWindowName,      // Button text 
+        this->dwStyle, // WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
+        this->x,         // x position 
+        this->y,         // y position 
+        this->nWidth,        // Button width
+        this->nHeight,        // Button height
         this->hWndParent,     // Parent window
-        NULL,       // No menu.
+        this->hMenu,       // No menu.
         this->hInstance,
-        NULL);      // Pointer not needed.
+        this->lpParam);      // Pointer not needed.
     return hwnd;
 }
