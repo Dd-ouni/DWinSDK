@@ -6,48 +6,50 @@
 #include <cstdio>
 #include <cstdlib>
 
+/* include DWinSDK 
+
+#include "DWinSDK.h"
+
+#ifdef _DEBUG
+
+#ifdef _WIN64
+#pragma comment(lib, "../x64/Debug/DWinSDK.lib")
+#else
+#pragma comment(lib, "../Debug/DWinSDK.lib")
+#endif // _WIN64
+
+#else
+
+#ifdef _WIN64
+#pragma comment(lib, "../x64/Debug/DWinSDK.lib")
+#else
+#pragma comment(lib, "../Release/DWinSDK.lib")
+#endif // _WIN64
+
+#endif // _DEBUG
+
+*/
+
+struct HookInfo
+{
+	HOOKPROC proc;
+};
+// _declspec(dllexport) 
+LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam);
+DWORD WINAPI ThreadProc(_In_ LPVOID lpParameter);
+LRESULT CALLBACK HookWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+_declspec(dllexport) void GetHookInfo(HookInfo* pHookInfo);
+using pFuncGetHookInfo = void (*)(HookInfo* pHookInfo);
 
 namespace D{
 	_declspec(dllexport) void OutputDebugStringEx(const wchar_t* strOutputString, ...);
 	_declspec(dllexport) void OutputDebugStringEx(const char* strOutputString, ...);
 
-	_declspec(dllexport) int GetWindowsText(HWND, PSTR&);
-	
-
-
-/*!
-	@brief Use end need CloseHandle(hProcess),
-必须开启权限  链接器 -> 清单文件 -> UAC执行级别 -> requireAdmin 
-
-
-	@param IN_OUT HANDLE& hProcess		// Process HANDLE
-	@param IN LPCVOID lpBaseAddress		// Read process address
-	@param IN_OUT LPVOID& lpBuffer		// Read buffer
-	@param IN SIZE_T nSize				// Read size
-	@param IN_ DWORD dwDesiredAccess	// Process PID
-
-	@return bool						// 
-*/
-	_declspec(dllexport) bool ReadProcessMemoryEx(
-		HANDLE&,
-		LPCVOID,
-		LPVOID&,
-		SIZE_T,
-		DWORD);
+	_declspec(dllexport) bool SetHookEx(int idHook, DWORD dwPid);
 
 	class _declspec(dllexport) AbstractWindow {
 	public:
-		LPCTSTR lpClassName;
-		LPCTSTR lpWindowName;
-		DWORD dwStyle;
-		int x;
-		int y;
-		int nWidth;
-		int nHeight;
-		HWND hWndParent;
-		HMENU hMenu;
-		HINSTANCE hInstance;
-		LPVOID lpParam;
+
 		AbstractWindow(
 			LPCTSTR lpClassName,
 			LPCTSTR lpWindowName,
@@ -70,9 +72,63 @@ namespace D{
 			hWndParent(hWndParent),
 			hMenu(hMenu),
 			hInstance(hInstance),
-			lpParam(lpParam) {};
+			lpParam(lpParam) {
+			this->Create();
+		}; 
+		int GetText(PSTR& pcText);
+		bool SetText(AbstractWindow& aWin);
+		bool SetText(PSTR pcText);
+		bool isSelf(PVOID& pHwnd);
+		bool isSelf(LPARAM& pHwnd);
+		bool getHwnd(HWND& pHwnd);
+	protected:
+		LPCTSTR lpClassName;
+		LPCTSTR lpWindowName;
+		DWORD dwStyle;
+		int x;
+		int y;
+		int nWidth;
+		int nHeight;
+		HWND hWndParent;
+		HMENU hMenu;
+		HINSTANCE hInstance;
+		LPVOID lpParam;
+		HWND wHwnd;
+		void Create();
+	};
 
-		HWND Create();
+	class _declspec(dllexport) MainControl : public AbstractWindow {
+	public:
+		MainControl(
+			LPTSTR lpClassName,
+			LPTSTR lpWindowName,
+			HINSTANCE hInstance,
+			int nWidth = 600,
+			int nHeight = 400,
+			int x = CW_USEDEFAULT,
+			int y = 0,
+			DWORD dwStyle = WS_OVERLAPPEDWINDOW,
+			HMENU hMenu = NULL,
+			LPVOID lpParam = NULL,
+			HWND hWndParent = NULL
+		) :AbstractWindow(
+			lpClassName,
+			lpWindowName,
+			dwStyle,
+			x,
+			y,
+			nWidth,
+			nHeight,
+			hWndParent,
+			hMenu,
+			hInstance,
+			lpParam) {
+
+			int scrWidth, scrHeight;
+			scrWidth = GetSystemMetrics(SM_CXSCREEN);
+			scrHeight = GetSystemMetrics(SM_CYSCREEN);
+			SetWindowPos(this->wHwnd, HWND_TOPMOST, (scrWidth - this->nWidth) / 2, (scrHeight - this->nHeight) / 2, this->nWidth, this->nHeight, SWP_SHOWWINDOW);
+		}
 	};
 
 	class _declspec(dllexport) ButtonControl : public AbstractWindow {
@@ -128,9 +184,9 @@ namespace D{
 			hMenu,
 			hInstance,
 			lpParam) {
-
 		}
 	};
 
-
 }
+
+
