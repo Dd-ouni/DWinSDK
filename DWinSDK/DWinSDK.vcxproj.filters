@@ -18,6 +18,9 @@
     <ClInclude Include="DWinSDK.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="wke.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

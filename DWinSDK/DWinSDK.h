@@ -5,6 +5,8 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstdlib>
+#include "wke.h"
+#include <commdlg.h>
 
 /* include DWinSDK 
 
@@ -41,11 +43,29 @@ LRESULT CALLBACK HookWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 _declspec(dllexport) void GetHookInfo(HookInfo* pHookInfo);
 using pFuncGetHookInfo = void (*)(HookInfo* pHookInfo);
 
+using pLoadLibrary = HMODULE(__stdcall *)(LPCSTR lpLibFileName);
+using pGetModuleHandle = HMODULE(__stdcall*)(LPCSTR lpModuleName);
+using pVirtualProtect = BOOL(__stdcall*)(LPVOID lpAddress, SIZE_T dwSize, DWORD flNewProtect, PDWORD lpflOldProtect);
+struct INJ_DATA_STRUCT {
+	pLoadLibrary _loadLibrary;
+	pGetModuleHandle _GetModuleHandle;
+	pVirtualProtect _VirtualProtect;
+	unsigned unEntryPointAddress;
+	unsigned unEntryPointInjFunAddress;
+	CHAR clEntryPointRepair[5];
+	CHAR clDllPath[260];
+};
+_declspec(dllexport) void EntryPointInjFunc();
+_declspec(dllexport) DWORD __stdcall InjRemoteThreadProc(INJ_DATA_STRUCT* injData);
+
 namespace D{
 	_declspec(dllexport) void OutputDebugStringEx(const wchar_t* strOutputString, ...);
 	_declspec(dllexport) void OutputDebugStringEx(const char* strOutputString, ...);
 
 	_declspec(dllexport) bool SetHookEx(int idHook, DWORD dwPid);
+
+	_declspec(dllexport) bool GetOpenFileNameEx(LPSTR& pFilePath);
+	/* https://www.kancloud.cn/digest/win32-dev/165907 */
 
 	class _declspec(dllexport) AbstractWindow {
 	public:
@@ -96,18 +116,18 @@ namespace D{
 		HWND wHwnd;
 		void Create();
 	};
-
+	
 	class _declspec(dllexport) MainControl : public AbstractWindow {
 	public:
 		MainControl(
 			LPTSTR lpClassName,
 			LPTSTR lpWindowName,
 			HINSTANCE hInstance,
-			int nWidth = 600,
-			int nHeight = 400,
+			int nWidth = 800,
+			int nHeight = 600,
 			int x = CW_USEDEFAULT,
 			int y = 0,
-			DWORD dwStyle = WS_OVERLAPPEDWINDOW,
+			DWORD dwStyle = WS_POPUP,
 			HMENU hMenu = NULL,
 			LPVOID lpParam = NULL,
 			HWND hWndParent = NULL
@@ -128,6 +148,10 @@ namespace D{
 			scrWidth = GetSystemMetrics(SM_CXSCREEN);
 			scrHeight = GetSystemMetrics(SM_CYSCREEN);
 			SetWindowPos(this->wHwnd, HWND_TOPMOST, (scrWidth - this->nWidth) / 2, (scrHeight - this->nHeight) / 2, this->nWidth, this->nHeight, SWP_SHOWWINDOW);
+			SetWindowLong(this->wHwnd, GWL_EXSTYLE, GetWindowLong(this->wHwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+			SetLayeredWindowAttributes(this->wHwnd, RGB(255, 0, 0), 0, LWA_COLORKEY);
+			ShowScrollBar(this->wHwnd, SB_BOTH | SB_CTL | SB_HORZ | SB_VERT, FALSE);
+		
 		}
 	};
 
@@ -187,6 +211,19 @@ namespace D{
 		}
 	};
 
+	class _declspec(dllexport) Inj {
+	public:
+		STARTUPINFO si;
+		PROCESS_INFORMATION pi;
+		LPVOID lpMemAddress;
+		Inj();
+		bool CreateInjData(INJ_DATA_STRUCT* pInjDataStruct, char* dllPath);
+		unsigned GetAddressOfEntryPoint(TCHAR* path);
+		bool StartProcess(LPCSTR lpApplicationName, LPSTR lpCommandLine, LPCSTR lpCurrentDirectory, bool bIsStop = false);
+		DWORD RunProcess();
+		bool MemAlloc(SIZE_T dwSize);
+		bool EntryPointInj(LPCSTR lpApplicationName, LPSTR lpCommandLine, LPCSTR lpCurrentDirectory, char* pcInjDllPath, bool bIsDebug = false);
+	};
 }
 
 
